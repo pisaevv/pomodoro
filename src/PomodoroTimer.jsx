@@ -20,6 +20,7 @@ export default class PomodoroTimer extends React.Component {
     autoCycle: true,
     settingsOpen: false,
     today: '',
+    isFullscreen: false,
   }
 
   componentDidMount() {
@@ -27,12 +28,16 @@ export default class PomodoroTimer extends React.Component {
     this.interval = setInterval(() => this.tick(), 250)
     window.addEventListener('keydown', this.onKey)
     document.addEventListener('visibilitychange', this.onVis)
+    document.addEventListener('fullscreenchange', this.onFsChange)
+    document.addEventListener('webkitfullscreenchange', this.onFsChange)
   }
 
   componentWillUnmount() {
     clearInterval(this.interval)
     window.removeEventListener('keydown', this.onKey)
     document.removeEventListener('visibilitychange', this.onVis)
+    document.removeEventListener('fullscreenchange', this.onFsChange)
+    document.removeEventListener('webkitfullscreenchange', this.onFsChange)
     this.releaseWakeLock()
   }
 
@@ -256,12 +261,34 @@ export default class PomodoroTimer extends React.Component {
     if (document.visibilityState === 'visible' && this.state.running && !this.wakeLock) this.requestWakeLock()
   }
 
+  onFsChange = () => {
+    const fs = !!(document.fullscreenElement || document.webkitFullscreenElement)
+    if (fs !== this.state.isFullscreen) this.setState({ isFullscreen: fs })
+  }
+
+  toggleFullscreen() {
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen
+        if (exit) exit.call(document)
+      } else {
+        const el = document.documentElement
+        const req = el.requestFullscreen || el.webkitRequestFullscreen
+        if (req) req.call(el)
+      }
+    } catch (e) {}
+  }
+
   onKey = (e) => {
-    if (e.code !== 'Space') return
     const t = e.target
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-    e.preventDefault()
-    this.toggle()
+    if (e.code === 'Space') {
+      e.preventDefault()
+      this.toggle()
+    } else if (e.code === 'KeyF') {
+      e.preventDefault()
+      this.toggleFullscreen()
+    }
   }
 
   // ---------- view model ----------
@@ -314,6 +341,7 @@ export default class PomodoroTimer extends React.Component {
     })
 
     const sideBtn = `width:62px;height:62px;border-radius:50%;border:1.5px solid ${c.hair};background:transparent;color:${c.inkDim};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s;`
+    const fsBtn = `position:fixed;bottom:clamp(20px,4vh,40px);right:clamp(20px,3.6vw,52px);z-index:50;width:42px;height:42px;border-radius:50%;border:1.5px solid ${c.hair};background:transparent;color:${c.inkDim};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s;`
     const startBtn = `width:96px;height:96px;border-radius:50%;border:none;background:${accent};color:${c.accentInk};cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px ${accent}, 0 8px 40px ${c.glow};transition:transform .2s,box-shadow .3s;`
 
     const honey = accents.focus
@@ -333,7 +361,8 @@ export default class PomodoroTimer extends React.Component {
       tFocus: tab('focus'), tShort: tab('short'), tLong: tab('long'),
       dots, setText: `${filled} / ${longEvery} to long break`,
       completedToday: s.completedToday,
-      sideBtn, startBtn,
+      sideBtn, startBtn, fsBtn,
+      isFullscreen: s.isFullscreen, toggleFullscreen: () => this.toggleFullscreen(),
       toggleSettings: () => this.setState(st => ({ settingsOpen: !st.settingsOpen })),
       closeSettings: () => this.setState({ settingsOpen: false }),
       stop: (e) => e.stopPropagation(),
@@ -430,6 +459,12 @@ export default class PomodoroTimer extends React.Component {
             <span style={css(`font:700 10px/1 'Space Mono',monospace;letter-spacing:.2em;color:${v.c.inkFaint};text-transform:uppercase;`)}>Completed today</span>
           </div>
         </div>
+
+        <HoverButton onClick={v.toggleFullscreen} title={v.isFullscreen ? 'Exit fullscreen (f)' : 'Fullscreen (f)'} style={css(v.fsBtn)} hoverStyle={css(`transform:scale(1.06);border-color:${v.c.inkDim}`)}>
+          {v.isFullscreen
+            ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"></path><path d="M21 8h-3a2 2 0 0 1-2-2V3"></path><path d="M3 16h3a2 2 0 0 1 2 2v3"></path><path d="M16 21v-3a2 2 0 0 1 2-2h3"></path></svg>
+            : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>}
+        </HoverButton>
 
         {v.settingsOpen && (
           <div onClick={v.closeSettings} style={css('position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(4,4,6,0.62);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);')}>
