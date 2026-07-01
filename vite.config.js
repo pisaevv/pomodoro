@@ -27,7 +27,7 @@ export default defineConfig({
       },
       workbox: {
         // Pre-cache the whole built app, including the self-hosted fonts, for full offline use.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}']
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2,wav}']
       }
     })
   ]

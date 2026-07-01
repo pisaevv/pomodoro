@@ -207,7 +207,18 @@ export default class PomodoroTimer extends React.Component {
     try {
       if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)()
       if (this.audioCtx.state === 'suspended') this.audioCtx.resume()
+      this.loadChimeBuffer()
     } catch (e) {}
+  }
+
+  // Fetch + decode the chime once, ahead of time, so playChime is instant.
+  loadChimeBuffer() {
+    if (!this.audioCtx || this.chimeBuffer || this.chimeLoading) return
+    this.chimeLoading = fetch('/sounds/chime.wav')
+      .then(r => { if (!r.ok) throw new Error('chime fetch failed'); return r.arrayBuffer() })
+      .then(buf => this.audioCtx.decodeAudioData(buf))
+      .then(decoded => { this.chimeBuffer = decoded })
+      .catch(() => { this.chimeBuffer = null }) // fall back to the oscillator beep
   }
 
   playChime() {
@@ -216,6 +227,16 @@ export default class PomodoroTimer extends React.Component {
       this.unlockAudio()
       const ctx = this.audioCtx
       if (!ctx) return
+      // Preferred: the decoded chime.wav. Falls back to the oscillator beep below.
+      if (this.chimeBuffer) {
+        const src = ctx.createBufferSource()
+        const g = ctx.createGain()
+        src.buffer = this.chimeBuffer
+        g.gain.value = 0.8
+        src.connect(g); g.connect(ctx.destination)
+        src.start()
+        return
+      }
       const now = ctx.currentTime
       const notes = this.state.mode === 'focus' ? [880, 1174.66] : [659.25, 987.77]
       notes.forEach((freq, i) => {
